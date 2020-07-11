@@ -1,0 +1,8 @@
+* Hex file
+
+:10 00 10 00 0C 94 6E 00 0C 94 6E 00 0C 94 6E 00 0C 94 6E 00 A8
+ ^  ^___^ ^  ^___________________ data ____________________^ ^
+ |    |   |                                                  |
+ |    |   record type                                        checksum
+ |    address
+ count

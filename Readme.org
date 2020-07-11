@@ -1,0 +1,95 @@
+* Tools
+** Intel HEX file loader
+#+BEGIN_SRC clojure
+
+(require '[clj-avr.hex-loader :as hex-loader])
+
+(hex-loader/load-hex "./resources/Blink.ino.hex")
+
+;; =>
+;; ({:type :data,
+;;   :address 0,
+;;   :data (12 148 92 0 12 148 110 0 12 148 110 0 12 148 110 0)}
+;;  {:type :data,
+;;   :address 16,
+;;   :data (12 148 110 0 12 148 110 0 12 148 110 0 12 148 110 0)}
+;;  {:type :data,
+;;   :address 32,
+;;   :data (12 148 110 0 12 148 110 0 12 148 110 0 12 148 110 0)}
+;; ...
+;; ...)
+
+#+END_SRC
+** Disassembler
+
+#+BEGIN_SRC clojure
+
+  (require '[clj-avr.disassembler :as da])
+
+  (da/disassemble-bytes [12 148 92 0 12 148 110 0 12 148 110 0 12 148 110 0])
+
+  ;;=>
+  ;;[{:op/args [:addr],
+  ;;  :addr 92,
+  ;;  :op/bytes-cnt 4,
+  ;;  :op :jmp,
+  ;;  :op/bytes 2483814492}
+  ;; {:op/args [:addr],
+  ;;  :addr 110,
+  ;;  :op/bytes-cnt 4,
+  ;;  :op :jmp,
+  ;;  :op/bytes 2483814510}
+  ;; {:op/args [:addr],
+  ;;  :addr 110,
+  ;;  :op/bytes-cnt 4,
+  ;;  :op :jmp,
+  ;;  :op/bytes 2483814510}
+  ;; {:op/args [:addr],
+  ;;  :addr 110,
+  ;;  :op/bytes-cnt 4,
+  ;;  :op :jmp,
+  ;;  :op/bytes 2483814510}]
+
+  (-> "./resources/Blink.ino.hex"
+      hex-loader/load-hex
+      da/disassemble-hex
+      da/print-disassemble)
+  ;; =>
+  ;; 0:   0c 94 5c 00	 jmp 0x005c
+  ;; 4:   0c 94 6e 00	 jmp 0x006e
+  ;; 8:   0c 94 6e 00	 jmp 0x006e
+  ;; c:   0c 94 6e 00	 jmp 0x006e
+  ;; 10:  0c 94 6e 00	 jmp 0x006e
+  ;; 14:  0c 94 6e 00	 jmp 0x006e
+  ;; 18:  0c 94 6e 00	 jmp 0x006e
+  ;; 1c:  0c 94 6e 00	 jmp 0x006e
+  ;; 20:  0c 94 6e 00	 jmp 0x006e
+  ;; 24:  0c 94 6e 00	 jmp 0x006e
+  ;; 28:  0c 94 6e 00	 jmp 0x006e
+  ;; 2c:  0c 94 6e 00	 jmp 0x006e
+  ;; 30:  0c 94 6e 00	 jmp 0x006e
+  ;; 34:  0c 94 6e 00	 jmp 0x006e
+  ;; 38:  0c 94 6e 00	 jmp 0x006e
+  ;; 3c:  0c 94 6e 00	 jmp 0x006e
+  ;; 40:  0c 94 13 01	 jmp 0x0113
+  ;; 44:  0c 94 6e 00	 jmp 0x006e
+  ;; 48:  0c 94 6e 00	 jmp 0x006e
+  ;; 4c:  0c 94 6e 00	 jmp 0x006e
+  ;; 50:  0c 94 6e 00	 jmp 0x006e
+  ;; 54:  0c 94 6e 00	 jmp 0x006e
+  ;; 58:  0c 94 6e 00	 jmp 0x006e
+  ;; 5c:  0c 94 6e 00	 jmp 0x006e
+  ;; 60:  0c 94 6e 00	 jmp 0x006e
+  ;; 64:  0c 94 6e 00	 jmp 0x006e
+  ;; 68:  00 00	 nop
+  ;; 6a:  00 00	 nop
+  ;; 6c:  24 00	 .dw 0x0024
+  ;; 6e:  27 00	 .dw 0x0027
+  ;; ....
+  ;; ....
+#+END_SRC
+
+Or you can just run the disassembler from the shell
+#+BEGIN_SRC bash
+clj -m clj-avr.disassembler ./resources/Blink.ino.hex
+#+END_SRC
