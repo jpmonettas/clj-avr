@@ -27,12 +27,12 @@
                                                               rest  ;; discard :
                                                               (partition 2)
                                                               (map #(apply str %))
-                                                              (map #(Integer/parseInt % 16)))]
+                                                              (map utils/hex->byte))]
 
     (when-not (valid-checksum? ln-bytes)
       (throw (ex-info "Invalid checksum" {:ln-bytes ln-bytes})))
 
-    (case rt
+    (case (utils/int-val rt)
       0  {:type :data
           :address (bit-or (bit-shift-left addr1 8) addr2) ;; pack both into a int
           :data (butlast data-and-chk)}

@@ -218,13 +218,13 @@
   "
 [dword pattern]
 (let [pad-dword-str (fn [s c] (str/replace (format "%32s" s) " " c))
-      dword-bin-str (pad-dword-str (Long/toBinaryString dword) "0")]
+      dword-bin-str (pad-dword-str (utils/n-to-binary-str dword) "0")]
   (loop [[[dw-c p-c] & r ] (map vector dword-bin-str pattern)
          vars {}]
     (if-not p-c
 
       (reduce-kv (fn [r v bits-str]
-                   (assoc r (keyword (str v)) (Long/parseLong bits-str 2)))
+                   (assoc r (keyword (str v)) (utils/bits->dword bits-str)))
                  {}
                  vars)
 
@@ -239,7 +239,7 @@
   [vars bindings]
   (let [bind-fn (fn [r [bind-sym bind-key]]
                   (let [increment (when-let [s (second (re-find #"\+\+(.+)" (name bind-key)))]
-                                    (Integer/parseInt s))
+                                    (utils/parse-int s))
                         bk (if increment
                              (keyword (str/replace (name bind-key) #"\+\+.+" ""))
                              bind-key)]
@@ -286,7 +286,7 @@
 
         (when-not inst
           (println "Couldn't disassemble instruction" {:dword next-dword
-                                                       :dword-bin (Long/toBinaryString next-dword)
+                                                       :dword-bin (utils/n-to-binary-str next-dword)
                                                        :dword-hex (format "%x" next-dword)}))
 
         (recur (drop (:op/bytes-cnt inst) bs)
@@ -336,12 +336,12 @@
   (def data-bytes '(12 148 92 0 12 148 110 0 12 148 110 0 12 148 110 0))
   (def first-word (read-word data-bytes))
   (def first-dword (read-dword data-bytes))
-  (Integer/toBinaryString first-word)
+  (utils/n-to-binary-str first-word)
 
-  (Long/toBinaryString first-dword)
+  (utils/n-to-binary-str first-dword)
   (def jump-pat "1001010kkkkk11ckkkkkkkkkkkkkkkkk")
 
-  (Long/toBinaryString (make-mask (indexes #{\0 \1} "1001010kkkkk11ckkkkkkkkkkkkkkkkk")))
+  (utils/n-to-binary-str (make-mask (indexes #{\0 \1} "1001010kkkkk11ckkkkkkkkkkkkkkkkk")))
 
   (parse-pattern "1001010kkkkk11ckkkkkkkkkkkkkkkkk")
   (next-opcode first-dword)
