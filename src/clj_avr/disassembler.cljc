@@ -195,6 +195,8 @@
 (let [[b1 b2] data-bytes]
   (bit-or (bit-shift-left b2 8) b1)))
 
+;; TODO: rename to read program dword, since it is specific
+;; of how the program is stored in hex
 (defn read-dword [data-bytes]
 (let [[b1 b2 b3 b4] data-bytes]
   (bit-or
