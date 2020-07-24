@@ -22,6 +22,7 @@
 #+END_SRC
 ** Disassembler
 
+*** Example
 #+BEGIN_SRC clojure
 
   (require '[clj-avr.disassembler :as da])
@@ -29,67 +30,106 @@
   (da/disassemble-bytes [12 148 92 0 12 148 110 0 12 148 110 0 12 148 110 0])
 
   ;;=>
-  ;;[{:op/args [:addr],
-  ;;  :addr 92,
-  ;;  :op/bytes-cnt 4,
-  ;;  :op :jmp,
-  ;;  :op/bytes 2483814492}
-  ;; {:op/args [:addr],
-  ;;  :addr 110,
-  ;;  :op/bytes-cnt 4,
-  ;;  :op :jmp,
-  ;;  :op/bytes 2483814510}
-  ;; {:op/args [:addr],
-  ;;  :addr 110,
-  ;;  :op/bytes-cnt 4,
-  ;;  :op :jmp,
-  ;;  :op/bytes 2483814510}
-  ;; {:op/args [:addr],
-  ;;  :addr 110,
-  ;;  :op/bytes-cnt 4,
-  ;;  :op :jmp,
-  ;;  :op/bytes 2483814510}]
+  [{:op/args [:addr],
+    :addr 92,
+    :op/bytes-cnt 4,
+    :op/pattern "1001010kkkkk110kkkkkkkkkkkkkkkkk",
+    :op/pattern-vars {\k "0000000000000001011100"},
+    :op :jmp,
+    :op/bytes 2483814492}
+   {:op/args [:addr],
+    :addr 110,
+    :op/bytes-cnt 4,
+    :op/pattern "1001010kkkkk110kkkkkkkkkkkkkkkkk",
+    :op/pattern-vars {\k "0000000000000001101110"},
+    :op :jmp,
+    :op/bytes 2483814510}
+   {:op/args [:addr],
+    :addr 110,
+    :op/bytes-cnt 4,
+    :op/pattern "1001010kkkkk110kkkkkkkkkkkkkkkkk",
+    :op/pattern-vars {\k "0000000000000001101110"},
+    :op :jmp,
+    :op/bytes 2483814510}
+   {:op/args [:addr],
+    :addr 110,
+    :op/bytes-cnt 4,
+    :op/pattern "1001010kkkkk110kkkkkkkkkkkkkkkkk",
+    :op/pattern-vars {\k "0000000000000001101110"},
+    :op :jmp,
+    :op/bytes 2483814510}]
 
-  (-> "./resources/Blink.ino.hex"
+  (-> "./resources/blink.hex"
       hex-loader/load-hex
       da/disassemble-hex
       da/print-disassemble)
   ;; =>
-  ;; 0:   0c 94 5c 00	 jmp 0x005c
-  ;; 4:   0c 94 6e 00	 jmp 0x006e
-  ;; 8:   0c 94 6e 00	 jmp 0x006e
-  ;; c:   0c 94 6e 00	 jmp 0x006e
-  ;; 10:  0c 94 6e 00	 jmp 0x006e
-  ;; 14:  0c 94 6e 00	 jmp 0x006e
-  ;; 18:  0c 94 6e 00	 jmp 0x006e
-  ;; 1c:  0c 94 6e 00	 jmp 0x006e
-  ;; 20:  0c 94 6e 00	 jmp 0x006e
-  ;; 24:  0c 94 6e 00	 jmp 0x006e
-  ;; 28:  0c 94 6e 00	 jmp 0x006e
-  ;; 2c:  0c 94 6e 00	 jmp 0x006e
-  ;; 30:  0c 94 6e 00	 jmp 0x006e
-  ;; 34:  0c 94 6e 00	 jmp 0x006e
-  ;; 38:  0c 94 6e 00	 jmp 0x006e
-  ;; 3c:  0c 94 6e 00	 jmp 0x006e
-  ;; 40:  0c 94 13 01	 jmp 0x0113
-  ;; 44:  0c 94 6e 00	 jmp 0x006e
-  ;; 48:  0c 94 6e 00	 jmp 0x006e
-  ;; 4c:  0c 94 6e 00	 jmp 0x006e
-  ;; 50:  0c 94 6e 00	 jmp 0x006e
-  ;; 54:  0c 94 6e 00	 jmp 0x006e
-  ;; 58:  0c 94 6e 00	 jmp 0x006e
-  ;; 5c:  0c 94 6e 00	 jmp 0x006e
-  ;; 60:  0c 94 6e 00	 jmp 0x006e
-  ;; 64:  0c 94 6e 00	 jmp 0x006e
-  ;; 68:  00 00	 nop
-  ;; 6a:  00 00	 nop
-  ;; 6c:  24 00	 .dw 0x0024
-  ;; 6e:  27 00	 .dw 0x0027
-  ;; ....
-  ;; ....
+  ;; 0x00000000 jmp	0x68
+  ;; 0x00000004 jmp	0x7c
+  ;; 0x00000008 jmp	0x7c
+  ;; 0x0000000c jmp	0x7c
+  ;; 0x00000010 jmp	0x7c
+  ;; 0x00000014 jmp	0x7c
+  ;; 0x00000018 jmp	0x7c
+  ;; 0x0000001c jmp	0x7c
+  ;; 0x00000020 jmp	0x7c
+  ;; 0x00000024 jmp	0x7c
+  ;; 0x00000028 jmp	0x7c
+  ;; 0x0000002c jmp	0x7c
+  ;; 0x00000030 jmp	0x7c
+  ;; 0x00000034 jmp	0x7c
+  ;; 0x00000038 jmp	0x7c
+  ;; 0x0000003c jmp	0x7c
+  ;; 0x00000040 jmp	0x7c
+  ;; 0x00000044 jmp	0x7c
+  ;; 0x00000048 jmp	0x7c
+  ;; 0x0000004c jmp	0x7c
+  ;; 0x00000050 jmp	0x7c
+  ;; 0x00000054 jmp	0x7c
+  ;; 0x00000058 jmp	0x7c
+  ;; 0x0000005c jmp	0x7c
+  ;; 0x00000060 jmp	0x7c
+  ;; 0x00000064 jmp	0x7c
+  ;; 0x00000068 eor	r1, r1
+  ;; 0x0000006a out	0x3f, r1
+  ;; 0x0000006c ldi	r28, 0xff
+  ;; 0x0000006e ldi	r29, 0x08
+  ;; 0x00000070 out	0x3e, r29
+  ;; 0x00000072 out	0x3d, r28
+  ;; 0x00000074 call	0x80
+  ;; 0x00000078 jmp	0xae
+  ;; 0x0000007c jmp	0
+  ;; 0x00000080 ldi	r24, 0xff
+  ;; 0x00000082 out	0x07, r24
+  ;; 0x00000084 out	0x08, r24
+  ;; 0x00000086 ldi	r18, 0xff
+  ;; 0x00000088 ldi	r19, 0xd3
+  ;; 0x0000008a ldi	r25, 0x30
+  ;; 0x0000008c subi	r18, 0x01
+  ;; 0x0000008e sbci	r19, 0x00
+  ;; 0x00000090 sbci	r25, 0x00
+  ;; 0x00000092 brne	.-8
+  ;; 0x00000094 rjmp	.+0
+  ;; 0x00000096 nop
+  ;; 0x00000098 out	0x08, r1
+  ;; 0x0000009a ldi	r18, 0xff
+  ;; 0x0000009c ldi	r19, 0xd3
+  ;; 0x0000009e ldi	r25, 0x30
+  ;; 0x000000a0 subi	r18, 0x01
+  ;; 0x000000a2 sbci	r19, 0x00
+  ;; 0x000000a4 sbci	r25, 0x00
+  ;; 0x000000a6 brne	.-8
+  ;; 0x000000a8 rjmp	.+0
+  ;; 0x000000aa nop
+  ;; 0x000000ac rjmp	.-42
+  ;; 0x000000ae cli
+  ;; 0x000000b0 rjmp	.-2
 #+END_SRC
 
 Or you can just run the disassembler from the shell
 #+BEGIN_SRC bash
 clj -m clj-avr.disassembler ./resources/Blink.ino.hex
 #+END_SRC
+*** Testing
+
+The clj-avr disassembler is automatically tested by comparing the output of an example hex file against the output produced by avr-gcc.

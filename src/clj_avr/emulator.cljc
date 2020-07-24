@@ -92,7 +92,10 @@
 
 (defmulti step-inst (fn [emu inst] (:op inst)))
 
-#_(defmethod step-inst :jmp [{:keys [memory registers] :as emu} {:keys []}]
+#_(defmethod step-inst :jmp [{:keys [memory registers] :as emu} {:keys [] :as inst}]
+  emu)
+
+(defmethod step-inst :nop [emu _]
   emu)
 
 (defmethod step-inst :default [emu inst]
@@ -103,7 +106,7 @@
   (when (or (= *emu-debug* :all)
             (and (set? *emu-debug*)
                  (contains? *emu-debug* (:op inst))))
-    (println "Running " inst)))
+    (println "Just executed " inst)))
 
 (defn step [{:keys [prog-mem regs] :as emu}]
   (let [pc (:pc regs)
@@ -149,6 +152,7 @@
 
   (def emu-after-load (load-prog (assoc-in (empty-emu) [:regs :pc] 0x6c)
                                  (hex-loader/load-hex "./resources/Blink.ino.hex")))
+  (run emu-after-load)
   (-> emu-after-load
       :prog-mem
       da/disassemble-bytes
