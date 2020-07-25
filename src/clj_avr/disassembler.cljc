@@ -27,8 +27,8 @@
    [:cpc      {"000001rdddddrrrr" '[d :dst-reg r :src-reg]}]
    [:sub      {"000110rdddddrrrr" '[d :dst-reg r :src-reg]}]
    [:sbc      {"000010rdddddrrrr" '[d :dst-reg r :src-reg]}]
-   [:add      {"000111rdddddrrrr" '[d :dst-reg r :src-reg]}]
-   [:adc      {"000011rdddddrrrr" '[d :dst-reg r :src-reg]}]
+   [:add      {"000011rdddddrrrr" '[d :dst-reg r :src-reg]}]
+   [:adc      {"000111rdddddrrrr" '[d :dst-reg r :src-reg]}]
    [:cpse     {"000100rdddddrrrr" '[d :dst-reg r :src-reg]}]
    [:and      {"001000rdddddrrrr" '[d :dst-reg r :src-reg]}]
    [:eor      {"001001rdddddrrrr" '[d :dst-reg r :src-reg]}]
@@ -171,8 +171,8 @@
    ;; this three are weird so will be a little worng for now,
    ;; will require a more expressive binding lang to implement
    ;; or maybe just a hack, will see
-   [:adiw     {"10010110kkppkkkk" '[]}]
-   [:sbiw     {"10010111kkppkkkk" '[]}]
+   [:adiw     {"10010110kkddkkkk" '[d :dst-reg k :const]}]
+   [:sbiw     {"10010111kkddkkkk" '[d :dst-reg k :const]}]
    [:cbr      {"0111kkkkddddkkkk" '[d :dst-reg++16 k :const]}] ;; 16-bit Opcode: (see ANDI with K complemented)
 
    ])
@@ -266,20 +266,28 @@
   Returns a map representing a instruction like {:op :op/bytes :op/args __op-related-info__}"
   [dword]
 
-  (let [inst-finder (fn [[mnem patterns]]
+  (let [;; the disassemble parser is not expresive enough for parsing adiw and sbiw dest-reg
+        ;; so we are fixing it here
+        fix-adiw-sbiw-dst-reg (fn [i] (update i :dst-reg (zipmap (range) [24 26 28 30])))
+        fix-movw-regs (fn [i]
+                        (let [fix (zipmap (range) (remove odd? (range 0 31)))]
+                             (-> i (update :dst-reg fix) (update :src-reg fix))))
+        inst-finder (fn [[mnem patterns]]
                       (when-let [match (some (fn [[p bindings]]
                                                (when-let [bits-vars (parse-dword dword p)]
-                                                 #_(print (format "%s -> %s" p (str bits-vars)))
                                                  (-> (bind-vars bits-vars bindings)
                                                      (assoc :op/bytes-cnt (quot (count p) 8)
                                                             :op/pattern p
                                                             :op/pattern-vars bits-vars))))
                                              patterns)]
-                        #_(println "-- OP" mnem)
                         (assoc match
                                :op mnem
-                               :op/bytes (bit-shift-right dword (* 8 (- 4 (:op/bytes-cnt match)))))))]
-    (some inst-finder instructions-table)))
+                               :op/bytes (bit-shift-right dword (* 8 (- 4 (:op/bytes-cnt match)))))))
+        inst (some inst-finder instructions-table)]
+
+    (cond-> inst
+      (#{:adiw :sbiw} (:op inst)) fix-adiw-sbiw-dst-reg
+      (#{:movw} (:op inst))       fix-movw-regs)))
 
 (defn disassemble-bytes
   "Disassemble a collection of bytes into a collection of instructions like:

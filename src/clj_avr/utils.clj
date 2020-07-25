@@ -21,7 +21,11 @@
 (defn bits->dword
   "Signed bits string to dword (as a long). Assuming bits string is two's complement encoded."
   [[f :as s]]
-  (* (Long/parseLong (twos-complement s) 2) (if (= \1 f) -1 0)))
+  ;; TODO: implement this in a faster way (without string manipulation)
+
+  (-> (Long/parseLong (if (= \1 f) (twos-complement s) s)  2)
+      (bit-and (Long/parseLong (apply str (repeat (count s) "1")) 2))
+      (* (if (= \1 f) -1 1))))
 
 (defn ubits->dword
   "Unsigned bits string to dword (as a long)"

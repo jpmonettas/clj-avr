@@ -9,6 +9,11 @@
 (def hex-examples ["./resources/blink.hex"
                    "./resources/factorial.hex"])
 
+(defn find-disassembly-in-hex [hex-file addr]
+  (->> (hex-loader/load-hex hex-file)
+       da/disassemble-hex
+       (some #(when (= (:memory/address %) addr) %))))
+
 (deftest disassembler-integration-test
   (doseq [hex-file hex-examples]
     (testing (format "Disassembling %s with avr-objdump and comparing the outputs" hex-file)
