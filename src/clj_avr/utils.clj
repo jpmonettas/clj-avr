@@ -33,3 +33,21 @@
 
 (defn int-val [x]
   (int x))
+
+(defn max-long-value []
+  (Long/MAX_VALUE))
+
+(defn xor [a b]
+  (or (and a (not b))
+      (and (not a) b)))
+
+(defn word-low [w]
+  (bit-and w 0xff))
+
+(defn word-high [w]
+  (bit-shift-right (bit-and w 0xff00) 8))
+
+(defn word [h l]
+  (bit-or
+   (bit-and l 0xff)
+   (bit-shift-left (bit-and h 0xff) 8)))

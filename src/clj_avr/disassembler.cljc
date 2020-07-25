@@ -122,7 +122,7 @@
    [:sbis     {"10011011aaaaabbb" '[a :io-reg b :bit]}]
    [:in       {"10110aadddddaaaa" '[d :dst-reg a :io-reg]}]
    [:out      {"10111aarrrrraaaa" '[a :io-reg r :src-reg]}]
-   [:rjmp     {"1100KKKKKKKKKKKK" '[K :addr]}]
+   [:rjmp     {"1100KKKKKKKKKKKK" '[K :const]}]
    [:ldi      {"1110kkkkddddkkkk" '[d :dst-reg++16 k :const]}]
    [:ser      {"11101111dddd1111" '[d :dst-reg++16]}]
    [:breq     {"111100KKKKKKK001" '[K :const]}]
@@ -320,7 +320,7 @@
 ;; Printing ;;
 ;;;;;;;;;;;;;;
 
-(def rel-branch-ops #{:brne :rjmp})
+(def rel-branch-ops #{:brne :rjmp :rcall})
 (def long-address-ops #{:jmp :call})
 
 (def reg-formatter (partial str "r"))
