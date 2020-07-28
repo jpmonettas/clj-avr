@@ -1,7 +1,7 @@
 (ns clj-avr.emulator
   (:require [clj-avr.disassembler :as da]
             [clj-avr.hex-loader :as hex-loader]
-            [clj-avr.utils :as utils]
+            [clj-avr.utils :as utils :refer [bit-red]]
             [clojure.string :as str]))
 
 (def ^:dynamic *emu-debug* #{})
@@ -22,7 +22,7 @@
 ;; |     32 Regs      | 0x0000 - 0x001F
 ;; |   64 I/O Regs    | 0x0020 - 0x005f (EEPROM addr, data, etc regs) (GPIOR0, GPIOR1, GPIOR2)
 ;; | 160 Ext I/O Regs | 0x0060 - 0x00FF
-;; |                  |
+;; |------------------|
 ;; |                  |
 ;; |   Internal SRAM  |
 ;; |    (1048 x 8)    |
@@ -37,6 +37,27 @@
 ;; X-register | R27 (0x1B) H | R26 (0x1A) L |
 ;; Y-register | R29 (0x1D) H | R28 (0x1C) L |
 ;; Z-register | R31 (0x1F) H | R30 (0x1E) L |
+
+  ;; for atmega328p------------------
+(def reg->addr
+
+  {:sreg 0x3f
+   :sph  0x3e
+   :spl  0x3d
+   :xh   0x1b
+   :xl   0x1a
+   :yh   0x1d
+   :yl   0x1c
+   :zh   0x1f
+   :zl   0x1e
+   })
+
+(def ram-end (+ 32 64 160 ;; registers
+              (* 2 1024) ;; 2k sdram memory
+              ))
+
+;; for atmega328p------------------
+
 
 (def io-reg->address #(- % 0x20))
 
@@ -57,8 +78,6 @@
   (:max-addr-written mem))
 
 ;;--------------------------------
-
-(def ram-end (* 2 1024))  ;; 2k memory
 
 (defn read-mem-byte [{:keys [regs data-mem] :as emu} addr]
   (if (<= addr 0xFF)
@@ -83,12 +102,6 @@
 
     (update emu :data-mem write-byte addr byte)))
 
-(def reg->addr
-  ;; for atmega328p
-  {:sreg 0x3f
-   :sph  0x3e
-   :spl  0x3d})
-
 (def addr->reg (reduce-kv (fn [r k v] (assoc r v k)) {} reg->addr))
 
 (defn empty-registers []
@@ -112,6 +125,9 @@
 
 (defn set-reg-by-io-reg [emu io-reg byte-val]
   (set-reg-by-addr emu (io-reg->address io-reg) byte-val))
+
+(defn get-reg-by-io-reg [emu io-reg]
+  (get-reg-by-addr emu (io-reg->address io-reg)))
 
 (defn set-pc [emu addr]
   (assoc-in emu [:regs :pc] addr))
@@ -148,6 +164,13 @@
         (set-reg-by-addr (reg->addr :sph) (utils/word-high sp-addr'))
         (set-reg-by-addr (reg->addr :spl) (utils/word-low  sp-addr')))))
 
+(defn peek-byte
+  "Returns the byte at the top of the stack"
+  [emu]
+  (let [sp-addr (sp-address emu)]
+    (read-mem-byte emu (+ sp-addr 1))))
+
+
 (defn push-word
   "Push a word into the stack, first push MSB then LSB"
   [emu word]
@@ -156,7 +179,7 @@
       (push-byte (utils/word-low  word))))
 
 (defn peek-word
-  "Peeks a word into the stack, the word will be [H: SP+2  L: SP+1]. Made to be used with push-word."
+  "Peeks a word from the stack, the word will be [H: SP+2  L: SP+1]. Made to be used with push-word."
   [emu]
   (let [sp-addr (sp-address emu)]
    (utils/word (read-mem-byte emu (+ sp-addr 2))
@@ -168,6 +191,29 @@
   (-> emu
       (pop-byte)
       (pop-byte)))
+
+(defn special-reg-addr [rk]
+  (case rk
+    :x [(reg->addr :xh) (reg->addr :xl)]
+    :y [(reg->addr :yh) (reg->addr :yl)]
+    :z [(reg->addr :zh) (reg->addr :zl)]))
+
+(defn set-special-reg
+  "Sets the special register X,Y or Z.
+  rk should be :x, :y or :z and word represented as a long"
+  [emu rk word]
+  (let [[addr-high addr-low] (special-reg-addr rk)]
+    (-> emu
+        (set-reg-by-addr addr-low  (utils/word-low  word))
+        (set-reg-by-addr addr-high (utils/word-high word)))))
+
+(defn get-special-reg
+  "Gets the special register X,Y or Z word. "
+  [emu rk]
+  (let [[addr-high addr-low] (special-reg-addr rk)]
+    (utils/word
+        (get-reg-by-addr emu addr-high)
+        (get-reg-by-addr emu addr-low))))
 
 (defn empty-emu []
   {:data-mem (basic-memory ram-end)
@@ -220,6 +266,104 @@
 
 (defmethod step-inst :rjmp [{:keys [regs] :as emu} {:keys [const] :as inst}]
   (set-pc emu (+ (:pc regs) const 1)))
+
+(defmethod step-inst :std [emu {:keys [y-reg+q src-reg z-reg+q] :as inst}]
+  (let [pointer (cond
+                  y-reg+q (+ y-reg+q (get-special-reg emu :y))
+                  z-reg+q (+ z-reg+q (get-special-reg emu :z))
+                  :else (throw (ex-info "Error when executing STD. y-reg+q or z-reg+q must be set" {:inst inst})))
+        sr (get-reg-by-addr emu src-reg)]
+    (-> emu
+        (write-mem-byte pointer sr))))
+
+(defmethod step-inst :add [emu {:keys [src-reg dst-reg]}]
+  (let [rr (get-reg-by-addr emu src-reg)
+        rd (get-reg-by-addr emu dst-reg)
+        r  (+ rr rd)]
+    (-> emu
+        (flag-set :h (bit-red [[rd 3] :and [rr 3] :or [rr 3] :and [:! r 3] :or [:! r 3] :and [rd 3]]))
+        (flag-set :s (utils/xor (flag-test emu :n) (flag-test emu :v)))
+        (flag-set :v (bit-red [[rd 7] :and [rr 7] :and [:! r 7] :or [:! rd 7] :and [:! rr 7] :and [r 7]]))
+        (flag-set :n (bit-test r 7))
+        (flag-set :z (zero? r))
+        (flag-set :c (bit-red [[rd 7] :and [rr 7] :or [rr 7] :and [:! r 7] :or [:! r 7] :and [rd 7]]))
+        (set-reg-by-addr dst-reg r))))
+
+(defmethod step-inst :in [emu {:keys [io-reg dst-reg] :as inst}]
+
+  #dbg ^{:break/when (#{0x86 0x88} (-> emu :regs :pc))}
+  (let [rd (get-reg-by-io-reg emu io-reg)]
+    (-> emu
+        (set-reg-by-addr dst-reg rd))))
+
+(defmethod step-inst :movw [emu {:keys [src-reg dst-reg] :as inst}]
+  (-> emu
+      (set-reg-by-addr dst-reg       (get-reg-by-addr emu src-reg))
+      (set-reg-by-addr (inc dst-reg) (get-reg-by-addr emu (inc src-reg)))))
+
+(defmethod step-inst :push [emu {:keys [src-reg] :as inst}]
+  (-> emu
+      (push-byte (get-reg-by-addr emu src-reg))))
+
+(defmethod step-inst :pop [emu {:keys [dst-reg] :as inst}]
+  (-> emu
+      (set-reg-by-addr dst-reg (peek-byte emu))
+      (pop-byte)))
+
+(defmethod step-inst :or [emu {:keys [dst-reg src-reg] :as inst}]
+  (let [rr (get-reg-by-addr emu src-reg)
+        rd (get-reg-by-addr emu dst-reg)
+        r  (bit-or rr rd)]
+    (-> emu
+        (set-reg-by-addr dst-reg r)
+        (flag-set :s (utils/xor (flag-test emu :n) (flag-test emu :v)))
+        (flag-set :v false)
+        (flag-set :n (bit-test r 7))
+        (flag-set :z (zero? r)))))
+
+(defmethod step-inst :mul [emu {:keys [src-reg dst-reg] :as inst}]
+  (let [rr (get-reg-by-addr emu src-reg)
+        rd (get-reg-by-addr emu dst-reg)
+        r (* rr rd)]
+    (-> emu
+        (set-reg-by-addr 0 (utils/word-low r))
+        (set-reg-by-addr 1 (utils/word-high r))
+        (flag-set :c (bit-test r 15))
+        (flag-set :z (zero? r)))))
+
+(defmethod step-inst :sbiw [emu {:keys [dst-reg const] :as inst}]
+  (let [rdl (get-reg-by-addr emu dst-reg)
+        rdh (get-reg-by-addr emu (inc dst-reg))
+        w (utils/word rdh rdl)
+        r (- w const)]
+    (-> emu
+        (set-reg-by-addr dst-reg       (utils/word-high r))
+        (set-reg-by-addr (inc dst-reg) (utils/word-low  r))
+        (flag-set :s (utils/xor (flag-test emu :n) (flag-test emu :v)))
+        (flag-set :v (bit-red [[:! r 15] :and [rdh 7]]))
+        (flag-set :n (bit-test r 15))
+        (flag-set :z (zero? r))
+        (flag-set :c (bit-red [[r 15] :and [:! rdh 7]])))))
+
+(defmethod step-inst :rcall [emu {:keys [const] :as inst}]
+  (let [pc (get-in emu [:regs :pc])]
+    (-> emu
+        (push-word (+ pc (:op/bytes-cnt inst))) ;; store the return address as pc+1
+        (set-pc (+ pc const (:op/bytes-cnt inst))))))
+
+(defmethod step-inst :brne [emu {:keys [const] :as inst}]
+  (let [pc (get-in emu [:regs :pc])]
+    (cond-> emu
+      (not (flag-test emu :z)) (set-pc (inc const)))))
+
+(defmethod step-inst :ldd [emu {:keys [y-reg+q dst-reg z-reg+q] :as inst}]
+  (let [pointer (cond
+                  y-reg+q (+ y-reg+q (get-special-reg emu :y))
+                  z-reg+q (+ z-reg+q (get-special-reg emu :z))
+                  :else (throw (ex-info "Error when executing LDD. y-reg+q or z-reg+q must be set" {:inst inst})))
+        sd (get-reg-by-addr emu dst-reg)]
+    (-> emu
+        (set-reg-by-addr dst-reg (read-mem-byte emu pointer)))))
 
 (defmethod step-inst :.dw [emu _]
   ;; this is also just a nop, since we couldn't disassemble it
@@ -313,9 +457,15 @@
 (comment
 
   (def emu-after-load (load-prog (empty-emu) (hex-loader/load-hex "./resources/factorial.hex")))
-  (run emu-after-load)
-  (-> emu-after-load
-      :prog-mem
-      da/disassemble-bytes
-      da/print-disassemble)
+
+  (let [{:keys [data max-addr-written]} (:prog-mem emu-after-load)]
+    (->> data
+         (take (inc max-addr-written))
+         da/disassemble-bytes
+         da/print-disassemble))
+
+  (binding [*emu-debug* :all]
+    (run emu-after-load 14))
+
+
   )

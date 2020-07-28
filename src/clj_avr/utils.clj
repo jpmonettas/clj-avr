@@ -55,3 +55,24 @@
   (bit-or
    (bit-and l 0xff)
    (bit-shift-left (bit-and h 0xff) 8)))
+
+(defn bit-red
+  "Bit reduce bits operations.
+  Bit-ops is like [[val1 bit1] :and [val2 bit2] :or ..] where
+  valn is a number and bitn is a bit position inside valn."
+  [bit-ops]
+  (let [resolve-bits (fn [x]
+                       (if (vector? x)
+                         (let [[a b c] x]
+                           (if (= :! a)
+                             (not (bit-test b c))
+                             (bit-test a b)))
+                         x))
+        bit-ops' (map resolve-bits bit-ops)]
+    (reduce (fn [r [opk v]]
+              (let [op (case opk
+                         :and #(and %1 %2)
+                         :or  #(or %1 %2))]
+                (op r v)))
+            (first bit-ops')
+            (partition 2 (rest bit-ops')))))

@@ -100,7 +100,7 @@
    [:lac      {"1001001ddddd0110" '[d :dst-reg]}]
    [:lat      {"1001001ddddd0111" '[d :dst-reg]}]
    [:pop      {"1001000ddddd1111" '[d :dst-reg]}]
-   [:push     {"1001001ddddd1111" '[d :dst-reg]}]
+   [:push     {"1001001ddddd1111" '[d :src-reg]}]
    [:com      {"1001010ddddd0000" '[d :dst-reg]}]
    [:neg      {"1001010ddddd0001" '[d :dst-reg]}]
    [:swap     {"1001010ddddd0010" '[d :dst-reg]}]

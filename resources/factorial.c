@@ -3,6 +3,9 @@
 // /home/jmonetta/non-rep-software/arduino-1.8.12/hardware/tools/avr/bin/avr-objcopy -O ihex -R .eeprom factorial.elf factorial.hex
 // /home/jmonetta/non-rep-software/arduino-1.8.12/hardware/tools/avr/bin/avr-objdump -m avr -D factorial.hex
 
+// For generating the map file
+// /home/jmonetta/non-rep-software/arduino-1.8.12/hardware/tools/avr/bin/avr-gcc -w -Os -g -flto -fuse-linker-plugin -Map,fac.map -Wl,--gc-sections -mmcu=atmega328p -o factorial.elf factorial.o
+
 
 int factorial(int n){
   if (n == 0) {
