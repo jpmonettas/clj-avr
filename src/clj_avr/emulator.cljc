@@ -77,6 +77,9 @@
 (defn mem-used [mem]
   (:max-addr-written mem))
 
+(defn mem-data [mem]
+  (:data mem))
+
 ;;--------------------------------
 
 (defn read-mem-byte [{:keys [regs data-mem] :as emu} addr]
@@ -373,14 +376,14 @@
   emu)
 
 (defmethod step-inst :default [emu inst]
-  (println (format "%s instruction not implemented." (:op inst)))
+  (println (utils/format "%s instruction not implemented." (:op inst)))
   emu)
 
 (defn print-stack [emu]
   (let [sp-addr (sp-address emu)]
     (print "| ")
     (doseq [pointer (reverse (range sp-addr ram-end))]
-      (print (format "%02x " (read-mem-byte emu (inc pointer)))))
+      (print (utils/format "%s " (utils/padded-hex (read-mem-byte emu (inc pointer)) 2))))
     (println "<sp")))
 
 (defn maybe-print-emu-debug [emu-prev inst emu-next]
@@ -400,11 +403,13 @@
                 (let [fv1 (flag-test emu-prev fk)
                       fv2 (flag-test emu-next fk)]
                   (when (utils/xor fv1 fv2)
-                    (print (format "%s: %s -> %s" fk fv1 fv2)))))
+                    (print (utils/format "%s: %s -> %s" fk fv1 fv2)))))
               (println))
 
             ;; print how the register changed
-            (println (format "   - r%s: %02x -> %02x" (str (or (addr->reg r) r)) v1 v2))))))
+            (println (utils/format "   - r%s: %s -> %s" (str (or (addr->reg r) r))
+                                   (utils/padded-hex v1 2)
+                                   (utils/padded-hex v2 2)))))))
     ;; print the stack
     (print "   -")
     (print-stack emu-next)))
@@ -431,7 +436,7 @@
       (update :status :halt))))
 
 (defn run
-  ([emu] (run emu (utils/max-long-value)))
+  ([emu] (run emu utils/max-long-value))
   ([emu max-iter]
    (loop [e (assoc emu :status :running)
           iter max-iter]
@@ -456,9 +461,11 @@
 
 (comment
 
-  (def emu-after-load (load-prog (empty-emu) (hex-loader/load-hex "./resources/factorial.hex")))
+  (def emu-after-load (load-prog (empty-emu) (hex-loader/parse-hex (slurp "./resources/factorial.hex"))))
 
-  (let [{:keys [data max-addr-written]} (:prog-mem emu-after-load)]
+  (let [prog-mem (:prog-mem emu-after-load)
+        data (mem-data prog-mem)
+        max-addr-written (mem-used mem)]
     (->> data
          (take (inc max-addr-written))
          da/disassemble-bytes

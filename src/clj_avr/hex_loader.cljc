@@ -41,23 +41,25 @@
       3 {:type :ext-lin-addr}
       4 {:type :start-lin-addr})))
 
-(defn load-hex
-  "Load a Intel HEX file from path"
-  [path]
-  (->> (utils/slurp-file path)
+(defn parse-hex
+  "Parse a Intel HEX file from a string"
+  [hex-file-str]
+  (->> hex-file-str
        (str/split-lines)
        (map parse-line)))
 
 (defn print-hex-data [parsed-line-bytes]
   (doseq [{:keys [type address data]} parsed-line-bytes]
     (when (= type :data)
-      (println (format "%016x - %s" address (->> data
-                                              (map #(format "%02x" %))
-                                              (str/join " ")))))))
+      (println (utils/format "%s - %s"
+                             (utils/padded-hex address 16)
+                             (->> data
+                                  (map #(utils/padded-hex % 2))
+                                  (str/join " ")))))))
 
 (comment
 
-  (print-hex-data (load-hex "./resources/Blink.ino.hex"))
+  (print-hex-data (parse-hex (slurp "./resources/Blink.ino.hex")))
 
   (hex-line->bytes ":100000000C945C000C946E000C946E000C946E00CA")
 

@@ -10,7 +10,8 @@
                    "./resources/factorial.hex"])
 
 (defn find-disassembly-in-hex [hex-file addr]
-  (->> (hex-loader/load-hex hex-file)
+  (->> (slurp hex-file)
+       hex-loader/parse-hex
        da/disassemble-hex
        (some #(when (= (:memory/address %) addr) %))))
 
@@ -30,7 +31,8 @@
                               (str/split-lines)
                               (filter #(str/starts-with? % "0x"))
                               (map normalize-line))
-           clj-avr-lines (->> (with-out-str (-> (hex-loader/load-hex hex-file)
+           clj-avr-lines (->> (with-out-str (-> (slurp hex-file)
+                                                hex-loader/parse-hex
                                                 da/disassemble-hex
                                                 da/print-disassemble))
                               str/split-lines

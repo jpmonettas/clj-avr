@@ -203,7 +203,7 @@
          c \"0\"}
   "
 [dword pattern]
-(let [pad-dword-str (fn [s c] (str/replace (format "%32s" s) " " c))
+(let [pad-dword-str (fn [s c] (str/replace (utils/format "%32s" s) " " c))
       dword-bin-str (pad-dword-str (utils/n-to-binary-str dword) "0")]
   (loop [[[dw-c p-c] & r ] (map vector dword-bin-str pattern)
          vars {}]
@@ -226,8 +226,8 @@
   "Read vars bit strings into dword (longs). If the var is uppercase read it as signed long,
   otherwise reads it as unsigned long."
   [vars]
-  (let [lowcase-char? #(<= (int \a) (int %) (int \z))
-        upcase-char?  #(<= (int \A) (int %) (int \Z))]
+  (let [lowcase-char? #(<= (utils/char-code \a) (utils/char-code %) (utils/char-code \z))
+        upcase-char?  #(<= (utils/char-code \A) (utils/char-code %) (utils/char-code \Z))]
     (reduce-kv (fn [r v bits-str]
                  (let [dword (cond
                                (lowcase-char? v) (utils/ubits->dword bits-str)
@@ -304,7 +304,7 @@
         (when-not inst
           (println "Couldn't disassemble instruction" {:dword next-dword
                                                        :dword-bin (utils/n-to-binary-str next-dword)
-                                                       :dword-hex (format "%x" next-dword)}))
+                                                       :dword-hex (utils/padded-hex next-dword 0)}))
 
         (recur (drop (:op/bytes-cnt inst) bs)
                (conj instructions inst))))))
@@ -332,7 +332,7 @@
 (def long-address-ops #{:jmp :call})
 
 (def reg-formatter (partial str "r"))
-(def hex-formatter (partial format "0x%02x"))
+(def hex-formatter #(str "0x" (utils/padded-hex % 2)))
 (def formatters
   {:bit     hex-formatter
    :addr    (fn [v] (if (> v 0) (hex-formatter v) (str v)))
@@ -350,40 +350,47 @@
    :y-reg   (constantly "Y")
    :y+-reg  (constantly "Y+")
    :-y-reg  (constantly "-Y")
-   :y-reg+q #(format "Y+%d" %)
+   :y-reg+q #(utils/format "Y+%d" %)
 
    :z-reg  (constantly "Z")
    :z+-reg  (constantly "Z+")
    :-z-reg (constantly "-Z")
-   :z-reg+q #(format "Z+%d" %)})
+   :z-reg+q #(utils/format "Z+%d" %)})
+
+(defn disassemble-inst-str [{:keys [:memory/address :op/bytes :op :op/args] :as inst}]
+  (with-out-str
+   (when address (print (utils/format "0x%s " (utils/padded-hex address 8))))
+   (print (utils/format "%s\t" (if op (name op) "<fail>")))
+   (print (->> args
+               (map (fn [a]
+                      (let [arg-v (get inst a)]
+                        (cond
+                          ;; I don't understand this yet, but looking at other disassemblers the long address ones
+                          ;; are shifted one bit to the left. Couldn't find any documentation.
+                          (long-address-ops op) ((formatters a) (bit-shift-left arg-v 1))
+                          (rel-branch-ops op)   (and arg-v (utils/format ".%s%d"  (if (neg? arg-v) "" "+") (* 2 arg-v)))
+                          :else                 ((formatters a) arg-v)))))
+               (str/join ", ")))
+   (print "\t\n")))
 
 (defn print-disassemble
   "Prints a disassemle to standard output."
   [disassemble]
-  (doseq [{:keys [:memory/address :op/bytes :op :op/args] :as inst} disassemble]
-    (when address (print (format "0x%08x " address)))
-    (print (format "%s\t" (if op (name op) "<fail>")))
-    (print (->> args
-                (map (fn [a]
-                       (let [arg-v (get inst a)]
-                         (cond
-                           ;; I don't understand this yet, but looking at other disassemblers the long address ones
-                           ;; are shifted one bit to the left. Couldn't find any documentation.
-                           (long-address-ops op) ((formatters a) (bit-shift-left arg-v 1))
-                           (rel-branch-ops op)   (and arg-v (format ".%s%d"  (if (neg? arg-v) "" "+") (* 2 arg-v)))
-                           :else                 ((formatters a) arg-v)))))
-                (str/join ", ")))
-    (print "\t\n")))
+  (doseq [inst disassemble]
+    (print (disassemble-inst-str inst))))
+
 
 ;;;;;;;;;;
 ;; Main ;;
 ;;;;;;;;;;
 
-(defn -main [& [hex-path]]
-  (-> hex-path
-      hex-loader/load-hex
-      disassemble-hex
-      print-disassemble))
+#?(:clj
+   (defn -main [& [hex-path]]
+     (-> hex-path
+         slurp
+         hex-loader/parse-hex
+         disassemble-hex
+         print-disassemble)))
 
 ;;;;;;;;;;;;;;;;;;
 ;; Repl testing ;;
@@ -401,9 +408,9 @@
 
   (next-opcode first-dword)
 
-  (-> (hex-loader/load-hex "./resources/blink.hex")
+  (-> (hex-loader/parse-hex (slurp "./resources/blink.hex"))
       disassemble-hex
       print-disassemble)
-  (disassemble-hex (hex-loader/load-hex "./resources/Blink.ino.hex"))
+  (disassemble-hex (hex-loader/parse-hex (slurp "./resources/Blink.ino.hex")))
 
   )
