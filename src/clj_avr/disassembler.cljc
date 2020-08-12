@@ -309,17 +309,20 @@
         (recur (drop (:op/bytes-cnt inst) bs)
                (conj instructions inst))))))
 
+(defn add-instr-mem-addresses [from insts]
+  (second
+   (reduce (fn [[addr r] inst]
+             [(+ addr (:op/bytes-cnt inst))
+              (conj r (assoc inst :memory/address addr))])
+           [from []]
+           insts)))
+
 (defn disassemble-hex
   "Disassembles a entire hex, as loaded by clj-avr.hex-loader/load-hex"
   [hex]
   (let [disasm-line (fn disasm-line [{:keys [address data]}]
-                      (let [disasm (disassemble-bytes data)]
-                        (second
-                         (reduce (fn [[addr r] inst]
-                                   [(+ addr (:op/bytes-cnt inst))
-                                    (conj r (assoc inst :memory/address addr))])
-                                 [address []]
-                                 disasm))))]
+                      (->> (disassemble-bytes data)
+                           (add-instr-mem-addresses address)))]
     (->> hex
          (filter #(= (:type %) :data))
          (mapcat disasm-line))))

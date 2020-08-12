@@ -52,6 +52,8 @@
    :zl   0x1e
    })
 
+(def addr->reg (reduce-kv (fn [r k v] (assoc r v k)) {} reg->addr))
+
 (def ram-end (+ 32 64 160 ;; registers
               (* 2 1024) ;; 2k sdram memory
               ))
@@ -105,12 +107,12 @@
 
     (update emu :data-mem write-byte addr byte)))
 
-(def addr->reg (reduce-kv (fn [r k v] (assoc r v k)) {} reg->addr))
-
 (defn empty-registers []
-  (->> (range 0xff)
+  (->> (range (inc 0xff))
        (map (fn [r]
               [r (cond
+                   ;; Not sure if this is needed, looks like it is responsability
+                   ;; of the program to set this up
                    (= r (reg->addr :sph)) (utils/word-high ram-end)
                    (= r (reg->addr :spl)) (utils/word-low  ram-end)
                    :else 0)]))

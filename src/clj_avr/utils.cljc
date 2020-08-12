@@ -12,8 +12,9 @@
 
 (defn padded-hex [n pad]
   #?(:clj  (format (str "%0" pad "x") n)
-     :cljs (str (apply str (repeat pad "0"))
-                (.toString n 16))))
+     :cljs (let [hex (.toString n 16)]
+             (str (apply str (repeat (- pad (count hex)) "0"))
+                  hex))))
 
 (defn char-code [c]
   #?(:clj  (int c)
