@@ -38,9 +38,8 @@
 ;; Y-register | R29 (0x1D) H | R28 (0x1C) L |
 ;; Z-register | R31 (0x1F) H | R30 (0x1E) L |
 
-  ;; for atmega328p------------------
-(def reg->addr
-
+;; for atmega328p------------------
+(def atmega328-reg->addr
   {:sreg 0x3f
    :sph  0x3e
    :spl  0x3d
@@ -49,16 +48,23 @@
    :yh   0x1d
    :yl   0x1c
    :zh   0x1f
-   :zl   0x1e
-   })
+   :zl   0x1e})
 
-(def addr->reg (reduce-kv (fn [r k v] (assoc r v k)) {} reg->addr))
+(def atmega328-addr->reg (reduce-kv (fn [r k v] (assoc r v k)) {} atmega328-reg->addr))
 
 (def ram-end (+ 32 64 160 ;; registers
               (* 2 1024) ;; 2k sdram memory
               ))
 
 ;; for atmega328p------------------
+
+(defn reg->addr [r]
+  (if (keyword? r)
+    (atmega328-reg->addr r)
+    r))
+
+(defn addr->reg [addr]
+  (get atmega328-addr->reg addr addr) )
 
 
 (def io-reg->address #(- % 0x20))
@@ -113,14 +119,14 @@
               [r (cond
                    ;; Not sure if this is needed, looks like it is responsability
                    ;; of the program to set this up
-                   (= r (reg->addr :sph)) (utils/word-high ram-end)
-                   (= r (reg->addr :spl)) (utils/word-low  ram-end)
+                   (= r (reg->addr :sph)) (utils/word-high (dec ram-end))
+                   (= r (reg->addr :spl)) (utils/word-low  (dec ram-end))
                    :else 0)]))
        (into {:pc 0})))
 
 (def flag-bit (zipmap [:c :z :n :v :s :h :t :i] (range)))
 
-(defn set-reg-by-addr [{:keys [regs] :as emu} addr byte-val]
+ (defn set-reg-by-addr [{:keys [regs] :as emu} addr byte-val]
   ;; address and reg number are the same thing
   (assoc-in emu [:regs addr] byte-val))
 
@@ -257,7 +263,7 @@
 (defmethod step-inst :out [emu {:keys [src-reg io-reg] :as inst}]
   (let [rs (get-reg-by-addr emu src-reg)]
     (-> emu
-        (set-reg-by-io-reg io-reg rs))))
+        (set-reg-by-addr io-reg rs))))
 
 
 (defmethod step-inst :ret [emu {:keys [] :as inst}]
@@ -270,7 +276,8 @@
   (flag-set emu :i false))
 
 (defmethod step-inst :rjmp [{:keys [regs] :as emu} {:keys [const] :as inst}]
-  (set-pc emu (+ (:pc regs) const 1)))
+  (let [k (* const 2)]
+   (set-pc emu (+ (:pc regs) k 2))))
 
 (defmethod step-inst :std [emu {:keys [y-reg+q src-reg z-reg+q] :as inst}]
   (let [pointer (cond
@@ -295,9 +302,7 @@
         (set-reg-by-addr dst-reg r))))
 
 (defmethod step-inst :in [emu {:keys [io-reg dst-reg] :as inst}]
-
-  #dbg ^{:break/when (#{0x86 0x88} (-> emu :regs :pc))}
-  (let [rd (get-reg-by-io-reg emu io-reg)]
+  (let [rd (get-reg-by-addr emu io-reg)]
     (-> emu
         (set-reg-by-addr dst-reg rd))))
 
@@ -342,8 +347,8 @@
         w (utils/word rdh rdl)
         r (- w const)]
     (-> emu
-        (set-reg-by-addr dst-reg       (utils/word-high r))
-        (set-reg-by-addr (inc dst-reg) (utils/word-low  r))
+        (set-reg-by-addr dst-reg       (utils/word-low  r))
+        (set-reg-by-addr (inc dst-reg) (utils/word-high r))
         (flag-set :s (utils/xor (flag-test emu :n) (flag-test emu :v)))
         (flag-set :v (bit-red [[:! r 15] :and [rdh 7]]))
         (flag-set :n (bit-test r 15))
@@ -351,15 +356,17 @@
         (flag-set :c (bit-red [[r 15] :and [:! rdh 7]])))))
 
 (defmethod step-inst :rcall [emu {:keys [const] :as inst}]
-  (let [pc (get-in emu [:regs :pc])]
+  (let [pc (get-in emu [:regs :pc])
+        k (* const 2)]
     (-> emu
         (push-word (+ pc (:op/bytes-cnt inst))) ;; store the return address as pc+1
-        (set-pc (+ pc const (:op/bytes-cnt inst))))))
+        (set-pc (+ pc k (:op/bytes-cnt inst))))))
 
 (defmethod step-inst :brne [emu {:keys [const] :as inst}]
-  (let [pc (get-in emu [:regs :pc])]
+  (let [pc (get-in emu [:regs :pc])
+        k (* 2 const)] ;; multiplying by instruction size
     (cond-> emu
-      (not (flag-test emu :z)) (set-pc (inc const)))))
+      (not (flag-test emu :z)) (set-pc (+ pc k 2)))))
 
 (defmethod step-inst :ldd [emu {:keys [y-reg+q dst-reg z-reg+q] :as inst}]
   (let [pointer (cond
@@ -477,4 +484,9 @@
     (run emu-after-load 14))
 
 
+  (= (-> (empty-emu)
+         (load-prog (hex-loader/parse-hex (slurp "./resources/factorial.hex")))
+         (run emu-after-load)
+         (get-reg-by-addr 24))
+     120)
   )
